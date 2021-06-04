@@ -839,8 +839,9 @@ class GeometryBuilder {
 
 			}
 
-		}
 
+		}
+    console.log('builder() data:', data);
 		for ( let i = 0; i < data.metadata.morphCount; i ++ ) {
 
 			const morph = data.morphs[ i ];
