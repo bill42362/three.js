@@ -929,6 +929,64 @@ class GeometryBuilder {
 
 		}
 
+    const textureSize = 4096 * 4096;
+
+    if ( data.metadata.format === 'pmx' ) {
+
+      const morphDataIndexes = [];
+      const morphDataElementIndexs = [];
+      const morphDataElementValues = [];
+
+      for ( let i = 0; i < data.metadata.morphCount; i ++ ) {
+
+        const morph = data.morphs[ i ];
+
+        switch ( morph.type ) {
+
+          case 1: {
+
+            morphDataIndexes.push( morphDataElementIndexs.length );
+
+            for ( let eIndex = 0; eIndex < morph.elementCount; eIndex ++ ) {
+
+              const element = morph.elements[ eIndex ];
+
+              morphDataElementIndexs.push( element.index );
+              morphDataElementValues.push(
+                element.position[0],
+                element.position[1],
+                element.position[2]
+              );
+
+            }
+
+            break;
+
+          }
+
+          default:
+          case 0: // group
+          case 2: // bone
+          case 3: // uv
+          case 4: // uv ext1
+          case 5: // uv ext2
+          case 6: // uv ext3
+          case 7: // uv ext4
+          case 8: // material
+          case 9: // flix
+          case 10: // impulse
+            morphDataIndexes.push( -1 );
+            break;
+
+        }
+
+      }
+
+      console.log('morphDataIndexes:', morphDataIndexes);
+      console.log('morphDataElementIndexs:', morphDataElementIndexs);
+      console.log('morphDataElementValues:', morphDataElementValues);
+    }
+
 		// rigid bodies from rigidBodies field.
 
 		for ( let i = 0; i < data.metadata.rigidBodyCount; i ++ ) {
