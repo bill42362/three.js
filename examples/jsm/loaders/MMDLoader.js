@@ -512,6 +512,7 @@ class GeometryBuilder {
 		const positions = [];
 		const uvs = [];
 		const normals = [];
+		const vertexIndexs = [];
 
 		const indices = [];
 
@@ -539,6 +540,8 @@ class GeometryBuilder {
 		for ( let i = 0; i < data.metadata.vertexCount; i ++ ) {
 
 			const v = data.vertices[ i ];
+
+      vertexIndexs.push(i);
 
 			for ( let j = 0, jl = v.position.length; j < jl; j ++ ) {
 
@@ -1000,6 +1003,7 @@ class GeometryBuilder {
 		geometry.setAttribute( 'position', new Float32BufferAttribute( positions, 3 ) );
 		geometry.setAttribute( 'normal', new Float32BufferAttribute( normals, 3 ) );
 		geometry.setAttribute( 'uv', new Float32BufferAttribute( uvs, 2 ) );
+		geometry.setAttribute( 'vertexIndexs', new Uint16BufferAttribute( vertexIndexs, 1 ) );
 		geometry.setAttribute( 'skinIndex', new Uint16BufferAttribute( skinIndices, 4 ) );
 		geometry.setAttribute( 'skinWeight', new Float32BufferAttribute( skinWeights, 4 ) );
 		geometry.setIndex( indices );
