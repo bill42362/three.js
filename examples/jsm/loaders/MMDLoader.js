@@ -429,6 +429,16 @@ class MeshBuilder {
 
 		const mesh = new SkinnedMesh( geometry, material );
 
+    material.forEach(function (mat) {
+   
+      mat._meshOnBeforeCompile = function (shader) {
+        shader.uniforms.morphTargetInfluences = {
+          value: mesh.morphTargetInfluences,
+        };
+      }
+   
+    });
+
 		const skeleton = new Skeleton( initBones( mesh ) );
 		mesh.bind( skeleton );
 
@@ -1234,9 +1244,9 @@ class MaterialBuilder {
 
 			//
 
-      console.log('materialBuilder() geometry:', geometry);
+      // console.log('materialBuilder() geometry:', geometry);
 			params.morphTargets = geometry.morphTargets.length > 0 ? true : false;
-			// params.morphTargets = false;
+			params.morphTargets = params.morphTargets && data.metadata.format !== 'pmx';
 			params.fog = true;
 
 			// blend
@@ -1393,6 +1403,12 @@ class MaterialBuilder {
 				params.emissive.multiplyScalar( 0.2 );
 
 			}
+
+      params.uniforms = {};
+      params.uniforms.morphTargetsCount = { value: geometry.morphTargets.length };
+      params.uniforms.morphDataIndexes = { value: geometry.userData.MMD.morphData.indexsTexture };
+      params.uniforms.morphDataElementIndexs = { value: geometry.userData.MMD.morphData.elementIndexsTexture };
+      params.uniforms.morphDataElementValues = { value: geometry.userData.MMD.morphData.elementValuesTexture };
 
 			materials.push( new MMDToonMaterial( params ) );
 
@@ -2249,7 +2265,11 @@ class MMDToonMaterial extends ShaderMaterial {
 
 		} );
 
-		this.uniforms = UniformsUtils.clone( MMDToonShader.uniforms );
+		this.uniforms = UniformsUtils.merge( [
+      UniformsUtils.clone( MMDToonShader.uniforms ),
+      parameters.uniforms,
+    ] );
+    delete parameters.uniforms;
 
 		// merged from MeshToon/Phong/MatcapMaterial
 		const exposePropertyNames = [
@@ -2288,6 +2308,8 @@ class MMDToonMaterial extends ShaderMaterial {
 			'envMap',
 			'reflectivity',
 			'refractionRatio',
+
+      'morphTargetInfluences',
 		];
 		for ( const propertyName of exposePropertyNames ) {
 
@@ -2295,7 +2317,7 @@ class MMDToonMaterial extends ShaderMaterial {
 
 				get: function () {
 
-					return this.uniforms[ propertyName ].value;
+          return this.uniforms[ propertyName ].value;
 
 				},
 
@@ -2315,6 +2337,38 @@ class MMDToonMaterial extends ShaderMaterial {
 			Object.getOwnPropertyDescriptor( this, 'diffuse' )
 		);
 
+    this._meshOnBeforeCompile = null;
+    this._userOnBeforeCompile = null;
+		Object.defineProperty(
+			this,
+			'onBeforeCompile',
+      {
+
+        get: function () {
+
+          return function (shader) {
+
+            if (this._meshOnBeforeCompile) {
+              this._meshOnBeforeCompile(shader);
+            }
+            if (this._userOnBeforeCompile) {
+              this._userOnBeforeCompile(shader);
+            }
+
+          };
+
+        },
+
+        set: function (value) {
+
+          this._userOnBeforeCompile = value;
+
+        },
+
+      }
+		);
+
+
 		this.setValues( parameters );
 
 	}
@@ -2333,6 +2387,9 @@ class MMDToonMaterial extends ShaderMaterial {
 		this.wireframeLinejoin = source.wireframeLinejoin;
 
 		this.flatShading = source.flatShading;
+
+    this._meshOnBeforeCompile = source._meshOnBeforeCompile;
+    this._userOnBeforeCompile = source._userOnBeforeCompile;
 
 		return this;
 

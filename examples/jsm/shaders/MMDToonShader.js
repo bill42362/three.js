@@ -97,6 +97,13 @@ const MMDToonShader = {
 		ShaderLib.toon.uniforms,
 		ShaderLib.phong.uniforms,
 		ShaderLib.matcap.uniforms,
+    {
+      morphTargetsCount: { value: 0 },
+      morphTargetInfluences: { value: [] },
+      morphDataIndexes: { value: null },
+      morphDataElementIndexs: { value: null },
+      morphDataElementValues: { value: null },
+    },
 	] ),
 
 	vertexShader: ShaderLib.phong.vertexShader,
