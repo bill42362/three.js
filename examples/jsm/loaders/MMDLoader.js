@@ -28,6 +28,11 @@ import {
 	SkinnedMesh,
 	SrcAlphaFactor,
 	TextureLoader,
+  DataTexture,
+  RedIntegerFormat,
+  RGBFormat,
+  UnsignedIntType,
+  FloatType,
 	Uint16BufferAttribute,
 	Vector3,
 	VectorKeyframeTrack,
@@ -525,6 +530,11 @@ class GeometryBuilder {
 		const morphTargets = [];
 		const morphPositions = [];
 
+    // morph data for pmx file
+    let morphDataIndexesTexture = null;
+    let morphDataElementIndexsTexture = null;
+    let morphDataElementValuesTexture = null;
+
 		const iks = [];
 		const grants = [];
 
@@ -929,9 +939,10 @@ class GeometryBuilder {
 
 		}
 
-    const textureSize = 4096 * 4096;
-
     if ( data.metadata.format === 'pmx' ) {
+      const width = 4096;
+      const height = width;
+      const textureSize = width * height;
 
       const morphDataIndexes = [];
       const morphDataElementIndexs = [];
@@ -975,16 +986,48 @@ class GeometryBuilder {
           case 8: // material
           case 9: // flix
           case 10: // impulse
-            morphDataIndexes.push( -1 );
+            morphDataIndexes.push( Math.pow( 2, 32 ) - 1 );
             break;
 
         }
 
       }
 
-      console.log('morphDataIndexes:', morphDataIndexes);
-      console.log('morphDataElementIndexs:', morphDataElementIndexs);
-      console.log('morphDataElementValues:', morphDataElementValues);
+      morphDataIndexesTexture = new DataTexture(
+        morphDataIndexes,
+        width,
+        1,
+        RedIntegerFormat,
+        UnsignedIntType,
+        RepeatWrapping,
+        RepeatWrapping,
+        NearestFilter,
+        NearestFilter,
+      );
+      morphDataIndexesTexture.internalFormat = 'R32UI';
+      morphDataElementIndexsTexture = new DataTexture(
+        morphDataElementIndexs,
+        width,
+        height,
+        RedIntegerFormat,
+        UnsignedIntType,
+        RepeatWrapping,
+        RepeatWrapping,
+        NearestFilter,
+        NearestFilter,
+      );
+      morphDataElementIndexsTexture.internalFormat = 'R32UI';
+      morphDataElementValuesTexture = new DataTexture(
+        morphDataElementValues,
+        width,
+        height,
+        RGBFormat,
+        FloatType,
+        RepeatWrapping,
+        RepeatWrapping,
+        NearestFilter,
+        NearestFilter,
+      );
     }
 
 		// rigid bodies from rigidBodies field.
@@ -1077,6 +1120,7 @@ class GeometryBuilder {
 		geometry.morphTargets = morphTargets;
 		geometry.morphAttributes.position = morphPositions;
 		geometry.morphTargetsRelative = false;
+		// geometry.morphTargetsRelative = data.metadata.format === 'pmx';
 
 		geometry.userData.MMD = {
 			bones: bones,
@@ -1086,6 +1130,16 @@ class GeometryBuilder {
 			constraints: constraints,
 			format: data.metadata.format
 		};
+
+    if ( data.metadata.format === 'pmx' ) {
+
+      geometry.userData.MMD.morphData = {
+        indexsTexture: morphDataIndexesTexture,
+        elementIndexsTexture: morphDataElementIndexsTexture,
+        elementValuesTexture: morphDataElementValuesTexture,
+      };
+
+    }
 
 		geometry.computeBoundingSphere();
 
@@ -1180,7 +1234,9 @@ class MaterialBuilder {
 
 			//
 
+      console.log('materialBuilder() geometry:', geometry);
 			params.morphTargets = geometry.morphTargets.length > 0 ? true : false;
+			// params.morphTargets = false;
 			params.fog = true;
 
 			// blend
