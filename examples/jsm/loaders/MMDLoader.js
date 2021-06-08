@@ -30,6 +30,7 @@ import {
 	TextureLoader,
   DataTexture,
   RedIntegerFormat,
+  RedFormat,
   RGBFormat,
   UnsignedIntType,
   FloatType,
@@ -386,6 +387,57 @@ const NON_ALPHA_CHANNEL_FORMATS = [
 	RGB_ETC2_Format
 ];
 
+function isScalarArraysEqual(arrayA, arrayB) {
+  return arrayA.length === arrayB.length && arrayA.every(
+    function(value, index) {
+      return value === arrayB[index];
+    }
+  );
+};
+
+function getMorphInfluenceTextureUpdater(mesh) {
+  const cachedMesh = mesh;
+  let lastFrame = -1;
+  let lastInfluences = [];
+  const array = new Float32Array(256 * 3);
+  const texture = new DataTexture(
+    array,
+    256,
+    1,
+    RGBFormat,
+    FloatType,
+    RepeatWrapping,
+    RepeatWrapping,
+    NearestFilter,
+    NearestFilter,
+  );
+  texture.needsUpdate = true;
+  return function updateMorphInfluenceTexture(renderer, _, __, geometry, material) {
+    const currentFrame = renderer.info.render.frame;
+    if (lastFrame === currentFrame) {
+      return;
+    }
+    lastFrame = currentFrame;
+
+    const shouldUpdateTexture = !isScalarArraysEqual(lastInfluences, mesh.morphTargetInfluences);
+    if (!shouldUpdateTexture) {
+      return;
+    }
+
+    lastInfluences = mesh.morphTargetInfluences.slice();
+    const array = new Float32Array(256 * 3);
+    lastInfluences.forEach(function (infu, index) {
+      array[index * 3] = infu;
+    });
+    texture.image.data = array;
+    texture.needsUpdate = true;
+
+    mesh.material.forEach(function (mat) {
+      mat.uniforms.morphTargetInfluences.value = texture;
+    });
+  };
+}
+
 // Builders. They build Three.js object from Object data parsed by MMDParser.
 
 /**
@@ -428,16 +480,8 @@ class MeshBuilder {
 			.build( data, geometry, onProgress, onError );
 
 		const mesh = new SkinnedMesh( geometry, material );
-
-    material.forEach(function (mat) {
-   
-      mat._meshOnBeforeCompile = function (shader) {
-        shader.uniforms.morphTargetInfluences = {
-          value: mesh.morphTargetInfluences,
-        };
-      }
-   
-    });
+    const morphTargetInfluencesUpdater = getMorphInfluenceTextureUpdater(mesh);
+    mesh.onBeforeRender = morphTargetInfluencesUpdater;
 
 		const skeleton = new Skeleton( initBones( mesh ) );
 		mesh.bind( skeleton );
@@ -1114,7 +1158,7 @@ class GeometryBuilder {
 		geometry.setAttribute( 'position', new Float32BufferAttribute( positions, 3 ) );
 		geometry.setAttribute( 'normal', new Float32BufferAttribute( normals, 3 ) );
 		geometry.setAttribute( 'uv', new Float32BufferAttribute( uvs, 2 ) );
-		geometry.setAttribute( 'vertexIndexs', new Uint16BufferAttribute( vertexIndexs, 1 ) );
+		geometry.setAttribute( 'vertexIndex', new Uint16BufferAttribute( vertexIndexs, 1 ) );
 		geometry.setAttribute( 'skinIndex', new Uint16BufferAttribute( skinIndices, 4 ) );
 		geometry.setAttribute( 'skinWeight', new Float32BufferAttribute( skinWeights, 4 ) );
 		geometry.setIndex( indices );
@@ -2337,6 +2381,7 @@ class MMDToonMaterial extends ShaderMaterial {
 			Object.getOwnPropertyDescriptor( this, 'diffuse' )
 		);
 
+    /*
     this._meshOnBeforeCompile = null;
     this._userOnBeforeCompile = null;
 		Object.defineProperty(
@@ -2367,6 +2412,7 @@ class MMDToonMaterial extends ShaderMaterial {
 
       }
 		);
+    */
 
 
 		this.setValues( parameters );
