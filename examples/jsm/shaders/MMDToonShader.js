@@ -27,11 +27,12 @@ varying vec4 vMorphDebug;
 
 const mmd_toon_morphtarget_vertex = `
 vMorphDebug = vec4(vec3(0.0), 1);
-for(int i = 0; i < morphTargetsCount; ++i) {
+vMorphDebug = texture2D(morphTargetInfluences, vec2(0.0, 0.0));
+//for(int i = 0; i < morphTargetsCount; ++i) {
   //vec4 influence = texture2D(morphTargetInfluences, vec2(0.0, 0.0));
   //vec4 influence = texture2D(morphTargetInfluences, vec2(float(i), 0.0));
   //vMorphDebug += influence;
-}
+//}
 //vMorphDebug = vec4(mod(vertexIndex / (256.0 * 256.0), 256.0) / 256.0, mod(vertexIndex / 256.0, 256.0) / 256.0, mod(vertexIndex, 256.0) / 256.0, 1);
 `;
 

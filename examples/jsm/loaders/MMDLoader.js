@@ -396,20 +396,18 @@ function isScalarArraysEqual(arrayA, arrayB) {
 };
 
 function getMorphInfluenceTextureUpdater(mesh) {
+  const width = 256;
+  const height = 1;
   const cachedMesh = mesh;
   let lastFrame = -1;
   let lastInfluences = [];
-  const array = new Float32Array(256 * 3);
+  const array = new Float32Array(width * height * 3);
   const texture = new DataTexture(
     array,
-    256,
-    1,
+    width,
+    height,
     RGBFormat,
-    FloatType,
-    RepeatWrapping,
-    RepeatWrapping,
-    NearestFilter,
-    NearestFilter,
+    FloatType
   );
   texture.needsUpdate = true;
   return function updateMorphInfluenceTexture(renderer, _, __, geometry, material) {
@@ -425,7 +423,7 @@ function getMorphInfluenceTextureUpdater(mesh) {
     }
 
     lastInfluences = mesh.morphTargetInfluences.slice();
-    const array = new Float32Array(256 * 3);
+    const array = new Float32Array(width * height * 3);
     lastInfluences.forEach(function (infu, index) {
       array[index * 3] = infu;
     });
