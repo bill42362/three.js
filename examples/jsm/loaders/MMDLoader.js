@@ -32,6 +32,7 @@ import {
   RedIntegerFormat,
   RedFormat,
   RGBFormat,
+  RGBAFormat,
   UnsignedIntType,
   FloatType,
 	Uint16BufferAttribute,
@@ -387,7 +388,8 @@ const NON_ALPHA_CHANNEL_FORMATS = [
 	RGB_ETC2_Format
 ];
 
-function isScalarArraysEqual(arrayA, arrayB) {
+// https://stackoverflow.com/a/19746771/2605764
+function areScalarArraysEqual(arrayA, arrayB) {
   return arrayA.length === arrayB.length && arrayA.every(
     function(value, index) {
       return value === arrayB[index];
@@ -396,7 +398,7 @@ function isScalarArraysEqual(arrayA, arrayB) {
 };
 
 function getMorphInfluenceTextureUpdater(mesh) {
-  const width = 256;
+  const width = 128;
   const height = 1;
   const cachedMesh = mesh;
   let lastFrame = -1;
@@ -410,14 +412,14 @@ function getMorphInfluenceTextureUpdater(mesh) {
     FloatType
   );
   texture.needsUpdate = true;
-  return function updateMorphInfluenceTexture(renderer, _, __, geometry, material) {
+  return function updateMorphInfluenceTexture(renderer) {
     const currentFrame = renderer.info.render.frame;
     if (lastFrame === currentFrame) {
       return;
     }
     lastFrame = currentFrame;
 
-    const shouldUpdateTexture = !isScalarArraysEqual(lastInfluences, mesh.morphTargetInfluences);
+    const shouldUpdateTexture = !areScalarArraysEqual(lastInfluences, mesh.morphTargetInfluences);
     if (!shouldUpdateTexture) {
       return;
     }
@@ -583,7 +585,7 @@ class GeometryBuilder {
 		const morphPositions = [];
 
     // morph data for pmx file
-    let morphDataIndexesTexture = null;
+    let morphDataVectorsTexture = null;
     let morphDataElementIndexsTexture = null;
     let morphDataElementValuesTexture = null;
 
@@ -992,11 +994,14 @@ class GeometryBuilder {
 		}
 
     if ( data.metadata.format === 'pmx' ) {
-      const width = 4096;
+      const width = 512;
       const height = width;
       const textureSize = width * height;
 
       const morphDataIndexes = [];
+      const morphDataLengths = [];
+      const morphDataSegmentIndexes = [];
+      const morphDataSegmentLengths = [];
       const morphDataElementIndexs = [];
       const morphDataElementValues = [];
 
@@ -1008,11 +1013,27 @@ class GeometryBuilder {
 
           case 1: {
 
-            morphDataIndexes.push( morphDataElementIndexs.length );
+            const sortedElements = morph.elements.sort((a, b) => a.index > b.index);
 
-            for ( let eIndex = 0; eIndex < morph.elementCount; eIndex ++ ) {
+            morphDataIndexes.push( morphDataSegmentIndexes.length );
+            morphDataLengths.push( 0 ); // begin with zero segments
 
-              const element = morph.elements[ eIndex ];
+            let lastElementIndex = null;
+
+            for ( let eIndex = 0; eIndex < sortedElements.length; eIndex ++ ) {
+
+              const element = sortedElements[ eIndex ];
+
+              if (eIndex === 0 || lastElementIndex !== element.index - 1) { // add new segment
+                morphDataLengths[morphDataLengths.length - 1]++;
+
+                morphDataSegmentIndexes.push( morphDataElementIndexs.length );
+                morphDataSegmentLengths.push( 1 );
+              } else {
+                morphDataSegmentLengths[morphDataSegmentLengths.length - 1]++;
+              }
+
+              lastElementIndex = element.index;
 
               morphDataElementIndexs.push( element.index );
               morphDataElementValues.push(
@@ -1038,47 +1059,57 @@ class GeometryBuilder {
           case 8: // material
           case 9: // flix
           case 10: // impulse
-            morphDataIndexes.push( Math.pow( 2, 32 ) - 1 );
+            morphDataIndexes.push( 0 );
+            morphDataLengths.push( 0 );
             break;
 
         }
 
       }
 
-      morphDataIndexesTexture = new DataTexture(
-        morphDataIndexes,
-        width,
-        1,
-        RedIntegerFormat,
-        UnsignedIntType,
-        RepeatWrapping,
-        RepeatWrapping,
-        NearestFilter,
-        NearestFilter,
-      );
-      morphDataIndexesTexture.internalFormat = 'R32UI';
-      morphDataElementIndexsTexture = new DataTexture(
-        morphDataElementIndexs,
+      const morphDataVectorsBuffer = new Float32Array(4 * width * height);
+      morphDataIndexes.forEach(function(v, i){
+        morphDataVectorsBuffer[4 * i] = v;
+        morphDataVectorsBuffer[4 * i + 1] = morphDataLengths[ i ];
+      });
+      morphDataSegmentIndexes.forEach(function(v, i){
+        morphDataVectorsBuffer[4 * i + 2] = v;
+        morphDataVectorsBuffer[4 * i + 3] = morphDataSegmentLengths[ i ];
+      });
+      morphDataVectorsTexture = new DataTexture(
+        morphDataVectorsBuffer,
         width,
         height,
-        RedIntegerFormat,
-        UnsignedIntType,
-        RepeatWrapping,
-        RepeatWrapping,
-        NearestFilter,
-        NearestFilter,
+        RGBAFormat,
+        FloatType
       );
-      morphDataElementIndexsTexture.internalFormat = 'R32UI';
-      morphDataElementValuesTexture = new DataTexture(
-        morphDataElementValues,
+      console.log('morphDataSegmentIndexes:', morphDataSegmentIndexes);
+      console.log('morphDataVectorsBuffer:', morphDataVectorsBuffer);
+
+      console.log('morphDataElementIndexs:', morphDataElementIndexs);
+      const morphDataElementIndexsBuffer = new Float32Array(3 * width * height);
+      morphDataElementIndexs.forEach(function(v, i){
+        morphDataElementIndexsBuffer[3 * i] = v;
+      });
+      morphDataElementIndexsTexture = new DataTexture(
+        morphDataElementIndexsBuffer,
         width,
         height,
         RGBFormat,
-        FloatType,
-        RepeatWrapping,
-        RepeatWrapping,
-        NearestFilter,
-        NearestFilter,
+        FloatType
+      );
+
+      console.log('morphDataElementValues:', morphDataElementValues);
+      const morphDataElementValuesBuffer = new Float32Array(3 * width * height);
+      morphDataElementValues.forEach(function(v, i){
+        morphDataElementValuesBuffer[i] = v;
+      });
+      morphDataElementValuesTexture = new DataTexture(
+        morphDataElementValuesBuffer,
+        width,
+        height,
+        RGBFormat,
+        FloatType
       );
     }
 
@@ -1156,7 +1187,7 @@ class GeometryBuilder {
 		geometry.setAttribute( 'position', new Float32BufferAttribute( positions, 3 ) );
 		geometry.setAttribute( 'normal', new Float32BufferAttribute( normals, 3 ) );
 		geometry.setAttribute( 'uv', new Float32BufferAttribute( uvs, 2 ) );
-		geometry.setAttribute( 'vertexIndex', new Uint16BufferAttribute( vertexIndexs, 1 ) );
+		geometry.setAttribute( 'vertexIndex', new Float32BufferAttribute( vertexIndexs, 1 ) );
 		geometry.setAttribute( 'skinIndex', new Uint16BufferAttribute( skinIndices, 4 ) );
 		geometry.setAttribute( 'skinWeight', new Float32BufferAttribute( skinWeights, 4 ) );
 		geometry.setIndex( indices );
@@ -1186,7 +1217,7 @@ class GeometryBuilder {
     if ( data.metadata.format === 'pmx' ) {
 
       geometry.userData.MMD.morphData = {
-        indexsTexture: morphDataIndexesTexture,
+        vectorsTexture: morphDataVectorsTexture,
         elementIndexsTexture: morphDataElementIndexsTexture,
         elementValuesTexture: morphDataElementValuesTexture,
       };
@@ -1448,7 +1479,7 @@ class MaterialBuilder {
 
       params.uniforms = {};
       params.uniforms.morphTargetsCount = { value: geometry.morphTargets.length };
-      params.uniforms.morphDataIndexes = { value: geometry.userData.MMD.morphData.indexsTexture };
+      params.uniforms.morphDataVectors = { value: geometry.userData.MMD.morphData.vectorsTexture };
       params.uniforms.morphDataElementIndexs = { value: geometry.userData.MMD.morphData.elementIndexsTexture };
       params.uniforms.morphDataElementValues = { value: geometry.userData.MMD.morphData.elementValuesTexture };
 

@@ -16,23 +16,65 @@
 import { UniformsUtils, ShaderLib } from '../../../build/three.module.js';
 
 const mmd_toon_morphtarget_pars_vertex = `
-attribute uint vertexIndex;
+attribute float vertexIndex;
 uniform int morphTargetsCount;
 uniform sampler2D morphTargetInfluences;
-uniform sampler2D morphDataIndexes;
+uniform sampler2D morphDataVectors;
 uniform sampler2D morphDataElementIndexs;
 uniform sampler2D morphDataElementValues;
 varying vec4 vMorphDebug;
 `;
 
+const dataWidth = 512;
 const mmd_toon_morphtarget_vertex = `
 vMorphDebug = vec4(vec3(0.0), 1);
-vMorphDebug = texture2D(morphTargetInfluences, vec2(0.0, 0.0));
-//for(int i = 0; i < morphTargetsCount; ++i) {
-  //vec4 influence = texture2D(morphTargetInfluences, vec2(0.0, 0.0));
-  //vec4 influence = texture2D(morphTargetInfluences, vec2(float(i), 0.0));
-  //vMorphDebug += influence;
-//}
+for(int i = 0; i < morphTargetsCount; ++i) {
+  float iFloat = float(i);
+  float influence = texture2D(morphTargetInfluences, vec2(iFloat / 128.0, 0.0)).r;
+  if (influence == 0.0) {
+    continue;
+  }
+
+  float vectorX = mod(iFloat, ${dataWidth}.0);
+  float vectorY = ((iFloat - vectorX) / ${dataWidth}.0);
+
+  vec4 morphDataVector = texture2D(morphDataVectors, vec2(vectorX / ${dataWidth}.0, vectorY / ${dataWidth}.0));
+  // .r: first segment index, .g: segments count
+  if (morphDataVector.g == 0.0) {
+    continue;
+  }
+
+  bool neverInTarget = false;
+  bool isInTarget = false;
+  float segmentsIndex = morphDataVector.r;
+  int segmentsCount = int(morphDataVector.g);
+
+  for(int iSegment = 0; iSegment < segmentsCount && !isInTarget && !neverInTarget; ++iSegment) {
+    float segmentIndex = segmentsIndex + float(iSegment);
+    vectorX = mod(segmentIndex, ${dataWidth}.0);
+    vectorY = ((segmentIndex - vectorX) / ${dataWidth}.0);
+    morphDataVector = texture2D(morphDataVectors, vec2(vectorX / ${dataWidth}.0, vectorY / ${dataWidth}.0));
+
+    float dataX = mod(morphDataVector.b, ${dataWidth}.0);
+    float dataY = ((morphDataVector.b - dataX) / ${dataWidth}.0);
+
+    float firstElementIndex = texture2D(morphDataElementIndexs, vec2(dataX / ${dataWidth}.0, dataY / ${dataWidth}.0)).r;
+    if (firstElementIndex > vertexIndex) {
+      neverInTarget = true;
+    }
+    if (firstElementIndex <= vertexIndex && (firstElementIndex + morphDataVector.a) > vertexIndex) {
+      isInTarget = true;
+    }
+  }
+
+  if (isInTarget) {
+    vMorphDebug.r += influence;
+  }
+
+  //float dataIndex = morphDataIndex + vertexIndex - firstElementIndex;
+
+  //vec4 value = texture2D(morphDataElementValues, vec2(x, y));
+}
 //vMorphDebug = vec4(mod(vertexIndex / (256.0 * 256.0), 256.0) / 256.0, mod(vertexIndex / 256.0, 256.0) / 256.0, mod(vertexIndex, 256.0) / 256.0, 1);
 `;
 
@@ -188,7 +230,7 @@ const MMDToonShader = {
     {
       morphTargetsCount: { value: 0 },
       morphTargetInfluences: { value: [] },
-      morphDataIndexes: { value: null },
+      morphDataVectors: { value: null },
       morphDataElementIndexs: { value: null },
       morphDataElementValues: { value: null },
     },
