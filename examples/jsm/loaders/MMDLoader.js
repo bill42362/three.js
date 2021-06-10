@@ -1084,10 +1084,7 @@ class GeometryBuilder {
         RGBAFormat,
         FloatType
       );
-      console.log('morphDataSegmentIndexes:', morphDataSegmentIndexes);
-      console.log('morphDataVectorsBuffer:', morphDataVectorsBuffer);
 
-      console.log('morphDataElementIndexs:', morphDataElementIndexs);
       const morphDataElementIndexsBuffer = new Float32Array(3 * width * height);
       morphDataElementIndexs.forEach(function(v, i){
         morphDataElementIndexsBuffer[3 * i] = v;
@@ -1100,7 +1097,6 @@ class GeometryBuilder {
         FloatType
       );
 
-      console.log('morphDataElementValues:', morphDataElementValues);
       const morphDataElementValuesBuffer = new Float32Array(3 * width * height);
       morphDataElementValues.forEach(function(v, i){
         morphDataElementValuesBuffer[i] = v;
