@@ -403,12 +403,12 @@ function getMorphInfluenceTextureUpdater(mesh) {
   const cachedMesh = mesh;
   let lastFrame = -1;
   let lastInfluences = [];
-  const array = new Float32Array(width * height * 3);
+  const array = new Float32Array(width * height);
   const texture = new DataTexture(
     array,
     width,
     height,
-    RGBFormat,
+    RedFormat,
     FloatType
   );
   texture.needsUpdate = true;
@@ -425,9 +425,9 @@ function getMorphInfluenceTextureUpdater(mesh) {
     }
 
     lastInfluences = mesh.morphTargetInfluences.slice();
-    const array = new Float32Array(width * height * 3);
+    const array = new Float32Array(width * height);
     lastInfluences.forEach(function (infu, index) {
-      array[index * 3] = infu;
+      array[index] = infu;
     });
     texture.image.data = array;
     texture.needsUpdate = true;
@@ -1085,15 +1085,15 @@ class GeometryBuilder {
         FloatType
       );
 
-      const morphDataElementIndexsBuffer = new Float32Array(3 * width * height);
+      const morphDataElementIndexsBuffer = new Float32Array(width * height);
       morphDataElementIndexs.forEach(function(v, i){
-        morphDataElementIndexsBuffer[3 * i] = v;
+        morphDataElementIndexsBuffer[i] = v;
       });
       morphDataElementIndexsTexture = new DataTexture(
         morphDataElementIndexsBuffer,
         width,
         height,
-        RGBFormat,
+        RedFormat,
         FloatType
       );
 
