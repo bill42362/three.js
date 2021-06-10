@@ -482,6 +482,7 @@ class MeshBuilder {
 		const mesh = new SkinnedMesh( geometry, material );
     const morphTargetInfluencesUpdater = getMorphInfluenceTextureUpdater(mesh);
     mesh.onBeforeRender = morphTargetInfluencesUpdater;
+    // TODO: need to replace depth/distance materials also.
 
 		const skeleton = new Skeleton( initBones( mesh ) );
 		mesh.bind( skeleton );

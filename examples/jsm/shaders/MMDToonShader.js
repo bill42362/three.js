@@ -22,12 +22,10 @@ uniform sampler2D morphTargetInfluences;
 uniform sampler2D morphDataVectors;
 uniform sampler2D morphDataElementIndexs;
 uniform sampler2D morphDataElementValues;
-varying vec4 vMorphDebug;
 `;
 
 const dataWidth = 512;
 const mmd_toon_morphtarget_vertex = `
-vMorphDebug = vec4(vec3(0.0), 1);
 for(int i = 0; i < morphTargetsCount; ++i) {
   float iFloat = float(i);
   float influence = texture2D(morphTargetInfluences, vec2(iFloat / 128.0, 0.0)).r;
@@ -48,6 +46,7 @@ for(int i = 0; i < morphTargetsCount; ++i) {
   bool isInTarget = false;
   float segmentsIndex = morphDataVector.r;
   int segmentsCount = int(morphDataVector.g);
+  float firstElementIndex = 0.0;
 
   for(int iSegment = 0; iSegment < segmentsCount && !isInTarget && !neverInTarget; ++iSegment) {
     float segmentIndex = segmentsIndex + float(iSegment);
@@ -58,7 +57,7 @@ for(int i = 0; i < morphTargetsCount; ++i) {
     float dataX = mod(morphDataVector.b, ${dataWidth}.0);
     float dataY = ((morphDataVector.b - dataX) / ${dataWidth}.0);
 
-    float firstElementIndex = texture2D(morphDataElementIndexs, vec2(dataX / ${dataWidth}.0, dataY / ${dataWidth}.0)).r;
+    firstElementIndex = texture2D(morphDataElementIndexs, vec2(dataX / ${dataWidth}.0, dataY / ${dataWidth}.0)).r;
     if (firstElementIndex > vertexIndex) {
       neverInTarget = true;
     }
@@ -67,15 +66,17 @@ for(int i = 0; i < morphTargetsCount; ++i) {
     }
   }
 
-  if (isInTarget) {
-    vMorphDebug.r += influence;
+  if (!isInTarget) {
+    continue;
   }
 
-  //float dataIndex = morphDataIndex + vertexIndex - firstElementIndex;
+  float valueIndex = morphDataVector.b + vertexIndex - firstElementIndex;
+  float valueX = mod(valueIndex, ${dataWidth}.0);
+  float valueY = ((valueIndex - valueX) / ${dataWidth}.0);
+  vec4 value = texture2D(morphDataElementValues, vec2(valueX / ${dataWidth}.0, valueY / ${dataWidth}.0));
 
-  //vec4 value = texture2D(morphDataElementValues, vec2(x, y));
+  transformed += value.xyz * influence;
 }
-//vMorphDebug = vec4(mod(vertexIndex / (256.0 * 256.0), 256.0) / 256.0, mod(vertexIndex / 256.0, 256.0) / 256.0, mod(vertexIndex, 256.0) / 256.0, 1);
 `;
 
 const phong_fragment = `
@@ -110,8 +111,6 @@ uniform float opacity;
 #include <logdepthbuf_pars_fragment>
 #include <clipping_planes_pars_fragment>
 
-varying vec4 vMorphDebug;
-
 void main() {
 	#include <clipping_planes_fragment>
 	vec4 diffuseColor = vec4( diffuse, opacity );
@@ -136,12 +135,11 @@ void main() {
 	vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;
 	#include <envmap_fragment>
 	gl_FragColor = vec4( outgoingLight, diffuseColor.a );
-  gl_FragColor = vMorphDebug;
-	//#include <tonemapping_fragment>
-	//#include <encodings_fragment>
-	//#include <fog_fragment>
-	//#include <premultiplied_alpha_fragment>
-	//#include <dithering_fragment>
+	#include <tonemapping_fragment>
+	#include <encodings_fragment>
+	#include <fog_fragment>
+	#include <premultiplied_alpha_fragment>
+	#include <dithering_fragment>
 }
 `;
 
@@ -236,7 +234,6 @@ const MMDToonShader = {
     },
 	] ),
 
-	//vertexShader: ShaderLib.phong.vertexShader,
 	vertexShader:
     ShaderLib.phong.vertexShader
       .replace(
@@ -249,8 +246,7 @@ const MMDToonShader = {
       ),
 
 	fragmentShader:
-		//ShaderLib.phong.fragmentShader
-    phong_fragment
+		ShaderLib.phong.fragmentShader
 			.replace(
 				'#include <common>',
 				`
