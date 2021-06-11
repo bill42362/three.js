@@ -227,7 +227,7 @@ const MMDToonShader = {
 		ShaderLib.matcap.uniforms,
     {
       morphMetadata: { value: new Vector3(0, 0, 0) },
-      morphTargetInfluences: { value: [] },
+      morphTargetInfluences: { value: null },
       morphDataVectors: { value: null },
       morphDataElementIndexs: { value: null },
       morphDataElementValues: { value: null },

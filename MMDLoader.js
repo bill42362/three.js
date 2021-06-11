@@ -407,7 +407,6 @@ function getMorphInfluenceTextureUpdater(mesh) {
   const cachedMesh = mesh;
   let lastFrame = -1;
   let lastInfluences = [];
-  let originalPositionArray = null;
   const array = new Float32Array(width * height);
   const texture = new DataTexture(
     array,
@@ -417,17 +416,12 @@ function getMorphInfluenceTextureUpdater(mesh) {
     FloatType
   );
   texture.needsUpdate = true;
-  return function updateMorphInfluenceTexture(renderer, _, __, geometry) {
+  return function updateMorphInfluenceTexture(renderer) {
     const currentFrame = renderer.info.render.frame;
     if (lastFrame === currentFrame) {
       return;
     }
     lastFrame = currentFrame;
-
-    const format = geometry.userData.MMD.format;
-    if (format !== 'pmx') {
-      return;
-    }
 
     const shouldUpdateTexture = !areScalarArraysEqual(lastInfluences, mesh.morphTargetInfluences);
     if (!shouldUpdateTexture) {
@@ -435,39 +429,12 @@ function getMorphInfluenceTextureUpdater(mesh) {
     }
 
     lastInfluences = mesh.morphTargetInfluences.slice();
-    const morphs = geometry.userData.MMD.morphs;
-    let positionArray = null;
-    // use cpu would be faster if most position not affected.
-    const useGpuVertexCount = 0.5 * geometry.attributes.position.count;
     const array = new Float32Array(width * height);
     lastInfluences.forEach(function (infu, index) {
-      const morph = morphs[index];
-      if (infu !== 0 && morph.type === 1 && morph.elementCount < useGpuVertexCount) {
-        if (!positionArray) {
-          if (!originalPositionArray) {
-            originalPositionArray = geometry.attributes.position.array.slice();
-          }
-          positionArray = originalPositionArray.slice();
-        }
-
-        morph.elements.forEach(function (element) {
-          positionArray[3 * element.index] += infu * element.position[0];
-          positionArray[3 * element.index + 1] += infu * element.position[1];
-          positionArray[3 * element.index + 2] += infu * element.position[2];
-        });
-        
-        array[index] = 0;
-        return;
-      }
-
       array[index] = infu;
     });
     texture.image.data = array;
     texture.needsUpdate = true;
-    if (positionArray) {
-      geometry.attributes.position.array = positionArray;
-      geometry.attributes.position.needsUpdate = true;
-    }
 
     mesh.material.forEach(function (mat) {
       if (!mat.uniforms.morphTargetInfluences.value) {
@@ -1245,7 +1212,7 @@ class GeometryBuilder {
 			grants: grants,
 			rigidBodies: rigidBodies,
 			constraints: constraints,
-			format: data.metadata.format,
+			format: data.metadata.format
       morphs: data.morphs,
 		};
 
