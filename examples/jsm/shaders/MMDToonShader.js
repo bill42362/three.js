@@ -13,19 +13,19 @@
  *  * Add mmd_toon_matcap_fragment.
  */
 
-import { UniformsUtils, ShaderLib } from '../../../build/three.module.js';
+import { Vector3, UniformsUtils, ShaderLib } from '../../../build/three.module.js';
 
 const mmd_toon_morphtarget_pars_vertex = `
 attribute float vertexIndex;
-uniform int morphTargetsCount;
+uniform vec3 morphMetadata; // x: targets count, y: vectors texture width, z: element texture width
 uniform sampler2D morphTargetInfluences;
 uniform sampler2D morphDataVectors;
 uniform sampler2D morphDataElementIndexs;
 uniform sampler2D morphDataElementValues;
 `;
 
-const dataWidth = 512;
 const mmd_toon_morphtarget_vertex = `
+int morphTargetsCount = int(morphMetadata.x);
 for(int i = 0; i < morphTargetsCount; ++i) {
   float iFloat = float(i);
   float influence = texture2D(morphTargetInfluences, vec2(iFloat / 128.0, 0.0)).r;
@@ -33,10 +33,10 @@ for(int i = 0; i < morphTargetsCount; ++i) {
     continue;
   }
 
-  float vectorX = mod(iFloat, ${dataWidth}.0);
-  float vectorY = ((iFloat - vectorX) / ${dataWidth}.0);
+  float vectorX = mod(iFloat, morphMetadata.y);
+  float vectorY = ((iFloat - vectorX) / morphMetadata.y);
 
-  vec4 morphDataVector = texture2D(morphDataVectors, vec2(vectorX / ${dataWidth}.0, vectorY / ${dataWidth}.0));
+  vec4 morphDataVector = texture2D(morphDataVectors, vec2(vectorX / morphMetadata.y, vectorY / morphMetadata.y));
   // .r: first segment index, .g: segments count
   if (morphDataVector.g == 0.0) {
     continue;
@@ -50,14 +50,14 @@ for(int i = 0; i < morphTargetsCount; ++i) {
 
   for(int iSegment = 0; iSegment < segmentsCount && !isInTarget && !neverInTarget; ++iSegment) {
     float segmentIndex = segmentsIndex + float(iSegment);
-    vectorX = mod(segmentIndex, ${dataWidth}.0);
-    vectorY = ((segmentIndex - vectorX) / ${dataWidth}.0);
-    morphDataVector = texture2D(morphDataVectors, vec2(vectorX / ${dataWidth}.0, vectorY / ${dataWidth}.0));
+    vectorX = mod(segmentIndex, morphMetadata.y);
+    vectorY = ((segmentIndex - vectorX) / morphMetadata.y);
+    morphDataVector = texture2D(morphDataVectors, vec2(vectorX / morphMetadata.y, vectorY / morphMetadata.y));
 
-    float dataX = mod(morphDataVector.b, ${dataWidth}.0);
-    float dataY = ((morphDataVector.b - dataX) / ${dataWidth}.0);
+    float dataX = mod(morphDataVector.b, morphMetadata.z);
+    float dataY = ((morphDataVector.b - dataX) / morphMetadata.z);
 
-    firstElementIndex = texture2D(morphDataElementIndexs, vec2(dataX / ${dataWidth}.0, dataY / ${dataWidth}.0)).r;
+    firstElementIndex = texture2D(morphDataElementIndexs, vec2(dataX / morphMetadata.z, dataY / morphMetadata.z)).r;
     if (firstElementIndex > vertexIndex) {
       neverInTarget = true;
     }
@@ -71,9 +71,9 @@ for(int i = 0; i < morphTargetsCount; ++i) {
   }
 
   float valueIndex = morphDataVector.b + vertexIndex - firstElementIndex;
-  float valueX = mod(valueIndex, ${dataWidth}.0);
-  float valueY = ((valueIndex - valueX) / ${dataWidth}.0);
-  vec4 value = texture2D(morphDataElementValues, vec2(valueX / ${dataWidth}.0, valueY / ${dataWidth}.0));
+  float valueX = mod(valueIndex, morphMetadata.z);
+  float valueY = ((valueIndex - valueX) / morphMetadata.z);
+  vec4 value = texture2D(morphDataElementValues, vec2(valueX / morphMetadata.z, valueY / morphMetadata.z));
 
   transformed += value.xyz * influence;
 }
@@ -226,7 +226,7 @@ const MMDToonShader = {
 		ShaderLib.phong.uniforms,
 		ShaderLib.matcap.uniforms,
     {
-      morphTargetsCount: { value: 0 },
+      morphMetadata: { value: new Vector3(0, 0, 0) },
       morphTargetInfluences: { value: [] },
       morphDataVectors: { value: null },
       morphDataElementIndexs: { value: null },

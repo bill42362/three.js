@@ -397,6 +397,10 @@ function areScalarArraysEqual(arrayA, arrayB) {
   );
 };
 
+function getPow2Width(size) {
+  return Math.pow( 2, Math.ceil( Math.log2( size ) / 2 ) );
+}
+
 function getMorphInfluenceTextureUpdater(mesh) {
   const width = 128;
   const height = 1;
@@ -995,10 +999,6 @@ class GeometryBuilder {
 		}
 
     if ( data.metadata.format === 'pmx' ) {
-      const width = 512;
-      const height = width;
-      const textureSize = width * height;
-
       const morphDataIndexes = [];
       const morphDataLengths = [];
       const morphDataSegmentIndexes = [];
@@ -1068,7 +1068,8 @@ class GeometryBuilder {
 
       }
 
-      const morphDataVectorsBuffer = new Float32Array(4 * width * height);
+      const vectorsBufferWidth = getPow2Width(morphDataSegmentIndexes.length);
+      const morphDataVectorsBuffer = new Float32Array(4 * vectorsBufferWidth * vectorsBufferWidth);
       morphDataIndexes.forEach(function(v, i){
         morphDataVectorsBuffer[4 * i] = v;
         morphDataVectorsBuffer[4 * i + 1] = morphDataLengths[ i ];
@@ -1079,32 +1080,33 @@ class GeometryBuilder {
       });
       morphDataVectorsTexture = new DataTexture(
         morphDataVectorsBuffer,
-        width,
-        height,
+        vectorsBufferWidth,
+        vectorsBufferWidth,
         RGBAFormat,
         FloatType
       );
 
-      const morphDataElementIndexsBuffer = new Float32Array(width * height);
+      const elementsBufferWidth = getPow2Width(morphDataElementIndexs.length);
+      const morphDataElementIndexsBuffer = new Float32Array(elementsBufferWidth * elementsBufferWidth);
       morphDataElementIndexs.forEach(function(v, i){
         morphDataElementIndexsBuffer[i] = v;
       });
       morphDataElementIndexsTexture = new DataTexture(
         morphDataElementIndexsBuffer,
-        width,
-        height,
+        elementsBufferWidth,
+        elementsBufferWidth,
         RedFormat,
         FloatType
       );
 
-      const morphDataElementValuesBuffer = new Float32Array(3 * width * height);
+      const morphDataElementValuesBuffer = new Float32Array(3 * elementsBufferWidth * elementsBufferWidth);
       morphDataElementValues.forEach(function(v, i){
         morphDataElementValuesBuffer[i] = v;
       });
       morphDataElementValuesTexture = new DataTexture(
         morphDataElementValuesBuffer,
-        width,
-        height,
+        elementsBufferWidth,
+        elementsBufferWidth,
         RGBFormat,
         FloatType
       );
@@ -1475,7 +1477,13 @@ class MaterialBuilder {
 			}
 
       params.uniforms = {};
-      params.uniforms.morphTargetsCount = { value: geometry.morphTargets.length };
+      params.uniforms.morphMetadata = {
+        value: new Vector3(
+          geometry.morphTargets.length,
+          geometry.userData.MMD.morphData.vectorsTexture.image.width,
+          geometry.userData.MMD.morphData.elementIndexsTexture.image.width,
+        )
+      };
       params.uniforms.morphDataVectors = { value: geometry.userData.MMD.morphData.vectorsTexture };
       params.uniforms.morphDataElementIndexs = { value: geometry.userData.MMD.morphData.elementIndexsTexture };
       params.uniforms.morphDataElementValues = { value: geometry.userData.MMD.morphData.elementValuesTexture };
@@ -2407,40 +2415,6 @@ class MMDToonMaterial extends ShaderMaterial {
 			Object.getOwnPropertyDescriptor( this, 'diffuse' )
 		);
 
-    /*
-    this._meshOnBeforeCompile = null;
-    this._userOnBeforeCompile = null;
-		Object.defineProperty(
-			this,
-			'onBeforeCompile',
-      {
-
-        get: function () {
-
-          return function (shader) {
-
-            if (this._meshOnBeforeCompile) {
-              this._meshOnBeforeCompile(shader);
-            }
-            if (this._userOnBeforeCompile) {
-              this._userOnBeforeCompile(shader);
-            }
-
-          };
-
-        },
-
-        set: function (value) {
-
-          this._userOnBeforeCompile = value;
-
-        },
-
-      }
-		);
-    */
-
-
 		this.setValues( parameters );
 
 	}
@@ -2459,9 +2433,6 @@ class MMDToonMaterial extends ShaderMaterial {
 		this.wireframeLinejoin = source.wireframeLinejoin;
 
 		this.flatShading = source.flatShading;
-
-    this._meshOnBeforeCompile = source._meshOnBeforeCompile;
-    this._userOnBeforeCompile = source._userOnBeforeCompile;
 
 		return this;
 
